@@ -45,11 +45,6 @@ API_PAIRS = [
     {"api_id": 36831962, "api_hash": "d18e551db78d3aef2ba6d01d97200d67", "app": "LO#1"},
     {"api_id": 39206977, "api_hash": "7b98d3010802d9ceff08de0713571525", "app": "LO#2"},
     {"api_id": 37734082, "api_hash": "786b389fb048ab28e79bf91d9b1b9239", "app": "LO#3"},
-    # Дополнительные
-    {"api_id": 23456231, "api_hash": "68fd00e74bdf2692de68835409eb13f1", "app": "LO#4"},
-    {"api_id": 39902941, "api_hash": "bdd2719544755d138dbcb30a049a44f1", "app": "LO#5"},
-    {"api_id": 37075049, "api_hash": "f39049a01787a852cd2832facddb707a", "app": "LO#6"},
-    {"api_id": 33386827, "api_hash": "fbf4de5514bae72e6cc0ba8cf61d6410", "app": "LO#7"},
     # Официальные клиенты Telegram
     {"api_id": 4,      "api_hash": "014b35b6184100b085b0d0572f9b5103", "app": "AndroidBeta"},
     {"api_id": 5,      "api_hash": "1c5c96d5edd401b1ed40db3fb5633e2d", "app": "StaticFinal"},
@@ -826,7 +821,24 @@ async def cb_again(cb: CallbackQuery):
     await cb.message.answer("📝 Репортнуть ещё?", reply_markup=report_again_kb(phone, username, tg_id))
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  MAIN
+#  FAKE HTTP SERVER FOR RENDER (keeps the web service alive)
+# ═══════════════════════════════════════════════════════════════════════════
+
+from aiohttp import web
+
+async def health_check(request):
+    return web.Response(text="Strykalo Bot is running!")
+
+async def start_fake_server():
+    app = web.Application()
+    app.router.add_get('/', health_check)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', int(os.environ.get('PORT', 10000)))
+    await site.start()
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  MAIN (updated for Render)
 # ═══════════════════════════════════════════════════════════════════════════
 
 async def main():
@@ -834,6 +846,10 @@ async def main():
         print("[!] pip install aiogram"); return
     if not AIOHTTP_OK:
         print("[!] pip install aiohttp"); return
+
+    # Start fake HTTP server for Render
+    asyncio.create_task(start_fake_server())
+
     logger.info("Strykalo Bot v9.7 starting...")
     await dp.start_polling(bot)
 
