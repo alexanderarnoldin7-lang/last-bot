@@ -821,24 +821,7 @@ async def cb_again(cb: CallbackQuery):
     await cb.message.answer("📝 Репортнуть ещё?", reply_markup=report_again_kb(phone, username, tg_id))
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  FAKE HTTP SERVER FOR RENDER (keeps the web service alive)
-# ═══════════════════════════════════════════════════════════════════════════
-
-from aiohttp import web
-
-async def health_check(request):
-    return web.Response(text="Strykalo Bot is running!")
-
-async def start_fake_server():
-    app = web.Application()
-    app.router.add_get('/', health_check)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', int(os.environ.get('PORT', 10000)))
-    await site.start()
-
-# ═══════════════════════════════════════════════════════════════════════════
-#  MAIN (updated for Render)
+#  MAIN
 # ═══════════════════════════════════════════════════════════════════════════
 
 async def main():
@@ -846,10 +829,6 @@ async def main():
         print("[!] pip install aiogram"); return
     if not AIOHTTP_OK:
         print("[!] pip install aiohttp"); return
-
-    # Start fake HTTP server for Render
-    asyncio.create_task(start_fake_server())
-
     logger.info("Strykalo Bot v9.7 starting...")
     await dp.start_polling(bot)
 
