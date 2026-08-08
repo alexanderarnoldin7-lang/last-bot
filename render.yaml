@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: strikalo-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python last.py
+    plan: free
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
