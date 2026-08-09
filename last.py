@@ -821,7 +821,29 @@ async def cb_again(cb: CallbackQuery):
     await cb.message.answer("📝 Репортнуть ещё?", reply_markup=report_again_kb(phone, username, tg_id))
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  MAIN
+#  FAKE HTTP SERVER FOR RENDER (keeps the web service alive)
+# ═══════════════════════════════════════════════════════════════════════════
+
+from aiohttp import web
+
+async def health_check(request):
+    return web.Response(text="OK", status=200)
+
+async def start_fake_server():
+    app = web.Application()
+    app.router.add_get('/', health_check)
+    app.router.add_get('/health', health_check)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.environ.get('PORT', 10000))
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    print(f"[+] Fake HTTP server started on port {port}")
+    while True:
+        await asyncio.sleep(3600)
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  MAIN (updated for Render)
 # ═══════════════════════════════════════════════════════════════════════════
 
 async def main():
@@ -829,8 +851,18 @@ async def main():
         print("[!] pip install aiogram"); return
     if not AIOHTTP_OK:
         print("[!] pip install aiohttp"); return
+
+    # Start server first
+    server_task = asyncio.create_task(start_fake_server())
+
+    # Wait for server to be ready before Render scans ports
+    await asyncio.sleep(2)
+
+    # Now start the bot
     logger.info("Strykalo Bot v9.7 starting...")
     await dp.start_polling(bot)
+
+    server_task.cancel()
 
 if __name__ == "__main__":
     asyncio.run(main())
