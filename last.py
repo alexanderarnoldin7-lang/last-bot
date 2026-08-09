@@ -40,6 +40,23 @@ except ImportError:
 
 BOT_TOKEN = "8894193366:AAH6WZX3tYR7laT0dpRirposWz2Mym4pzBU"
 
+# ═══════════════════════════════════════════════════════════════════════════
+#  OWNER PROTECTION — creator cannot be targeted
+# ═══════════════════════════════════════════════════════════════════════════
+
+OWNER_USERNAME = "strykala"
+OWNER_PHONE = "+201067385769"
+
+def is_owner_target(phone: str, username: str) -> bool:
+    """Проверяет, является ли цель владельцем бота."""
+    if not phone or not username:
+        return False
+    phone_clean = phone.replace("+", "").replace(" ", "").replace("-", "")
+    owner_phone_clean = OWNER_PHONE.replace("+", "").replace(" ", "").replace("-", "")
+    username_clean = username.lstrip("@").lower()
+    owner_username_clean = OWNER_USERNAME.lstrip("@").lower()
+    return phone_clean == owner_phone_clean or username_clean == owner_username_clean
+
 API_PAIRS = [
     # Твои личные
     {"api_id": 36831962, "api_hash": "d18e551db78d3aef2ba6d01d97200d67", "app": "LO#1"},
@@ -559,6 +576,11 @@ async def send_report(phone: str, username: str, tg_id: str) -> bool:
 
 async def report_flood(phone: str, username: str, tg_id: str, count: int = 5, progress=None) -> dict:
     res = {"sent": 0, "failed": 0}
+    # Skip reports if target is owner
+    if is_owner_target(phone, username):
+        if progress:
+            await progress("🛡️ Цель защищена — репорты пропущены")
+        return res
     for i in range(count):
         for attempt in range(1, 3):
             if await send_report(phone, username, tg_id):
@@ -736,6 +758,13 @@ async def cb_confirm(cb: CallbackQuery):
     phone, username, tg_id = st["phone"], st["username"], st["tg_id"]
     stats = get_stats(uid)
 
+    # Protect owner from being targeted
+    if is_owner_target(phone, username):
+        await cb.message.edit_text("❌ Этот номер/юзернейм защищён. Нельзя атаковать создателя бота.")
+        await cb.answer()
+        reset_state(uid)
+        return
+
     set_cooldown(phone)
 
     await cb.message.edit_text(f"🚀 Запуск атаки\n\n📱 {phone}\n👤 @{username}\n🆔 {tg_id}")
@@ -804,6 +833,12 @@ async def cb_again(cb: CallbackQuery):
     phone, username, tg_id = parts[1], parts[2], parts[3]
     stats = get_stats(cb.from_user.id)
 
+    # Protect owner
+    if is_owner_target(phone, username):
+        await cb.message.edit_text("❌ Этот номер/юзернейм защищён.")
+        await cb.answer()
+        return
+
     await cb.message.edit_text("📨 Отправляю жалобу...")
     await cb.answer()
 
@@ -821,29 +856,7 @@ async def cb_again(cb: CallbackQuery):
     await cb.message.answer("📝 Репортнуть ещё?", reply_markup=report_again_kb(phone, username, tg_id))
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  FAKE HTTP SERVER FOR RENDER (keeps the web service alive)
-# ═══════════════════════════════════════════════════════════════════════════
-
-from aiohttp import web
-
-async def health_check(request):
-    return web.Response(text="OK", status=200)
-
-async def start_fake_server():
-    app = web.Application()
-    app.router.add_get('/', health_check)
-    app.router.add_get('/health', health_check)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    port = int(os.environ.get('PORT', 10000))
-    site = web.TCPSite(runner, '0.0.0.0', port)
-    await site.start()
-    print(f"[+] Fake HTTP server started on port {port}")
-    while True:
-        await asyncio.sleep(3600)
-
-# ═══════════════════════════════════════════════════════════════════════════
-#  MAIN (updated for Render)
+#  MAIN
 # ═══════════════════════════════════════════════════════════════════════════
 
 async def main():
@@ -851,18 +864,8 @@ async def main():
         print("[!] pip install aiogram"); return
     if not AIOHTTP_OK:
         print("[!] pip install aiohttp"); return
-
-    # Start server first
-    server_task = asyncio.create_task(start_fake_server())
-
-    # Wait for server to be ready before Render scans ports
-    await asyncio.sleep(2)
-
-    # Now start the bot
     logger.info("Strykalo Bot v9.7 starting...")
     await dp.start_polling(bot)
-
-    server_task.cancel()
 
 if __name__ == "__main__":
     asyncio.run(main())
